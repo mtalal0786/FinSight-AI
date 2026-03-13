@@ -1,8 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1",
-  },
+  // react-markdown v9+ is ESM-only; transpile it for Next.js
+  transpilePackages: ["react-markdown", "remark-gfm", "remark-parse", "unified"],
 };
 
 module.exports = nextConfig;

@@ -1,4 +1,6 @@
 import re
+from typing import Optional, Union
+
 from langgraph.graph import StateGraph, END
 from app.agents.state.schemas import AgentState
 from app.agents.nodes.router import reasoning_node
@@ -106,7 +108,7 @@ def create_agent_graph():
 agent_graph = create_agent_graph()
 
 
-async def run_agentic_query(user_query: str, doc_id: str | None = None) -> dict:
+async def run_agentic_query(user_query: str, doc_id: Optional[Union[str, list[str]]] = None) -> dict:
     initial_state: AgentState = {
         "user_query": user_query,
         "doc_id": doc_id,

@@ -1,145 +1,225 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("finsight_token");
+function authH(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const t = localStorage.getItem("finsight_token");
+  return t ? { Authorization: `Bearer ${t}` } : {};
 }
 
-function authHeaders(): Record<string, string> {
-  const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+async function req<T>(path: string, opts?: RequestInit): Promise<T> {
+  const res = await fetch(BASE + path, opts);
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  if (!res.ok) {
+    const detail = (data as { detail?: string })?.detail;
+    throw new Error(detail || `HTTP ${res.status}`);
+  }
+  return data as T;
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-
-export async function register(email: string, username: string, password: string) {
-  const res = await fetch(`${API_BASE}/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, username, password }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || "Registration failed");
-  return data;
-}
-
-export async function login(email: string, password: string) {
-  const form = new URLSearchParams();
-  form.append("username", email);
-  form.append("password", password);
-
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: form,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || "Login failed");
-  return data;
-}
-
-// ── Documents ─────────────────────────────────────────────────────────────────
-
-export async function uploadPDF(file: File) {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const res = await fetch(`${API_BASE}/documents/upload`, {
-    method: "POST",
-    headers: { ...authHeaders() },
-    body: formData,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || "Upload failed");
-  return data;
-}
-
-export async function simpleQuery(question: string, docId?: string) {
-  const res = await fetch(`${API_BASE}/documents/query`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ question, doc_id: docId }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || "Query failed");
-  return data;
-}
-
-export async function agentQuery(query: string, docId?: string) {
-  const res = await fetch(`${API_BASE}/documents/agent/query`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ query, doc_id: docId }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || "Agent query failed");
-  return data;
-}
-
-export async function getStatus() {
-  const res = await fetch(`${API_BASE}/documents/status`);
-  return res.json();
-}
-
-export async function getHistory() {
-  const res = await fetch(`${API_BASE}/history/queries`, {
-    headers: { ...authHeaders() },
-  });
-  if (!res.ok) return { queries: [] };
-  return res.json();
-}
-
-// ── Streaming ─────────────────────────────────────────────────────────────────
-
-export function streamAgentQuery(
-  query: string,
-  docId: string | undefined,
-  onToken: (token: string) => void,
-  onStatus: (msg: string) => void,
-  onDone: (meta: Record<string, unknown>) => void,
-  onError: (err: string) => void
-): () => void {
-  let cancelled = false;
-
-  (async () => {
-    try {
-      const res = await fetch(`${API_BASE}/documents/agent/stream`, {
+export const api = {
+  auth: {
+    register: (email: string, username: string, password: string) =>
+      req<{ message: string }>("/auth/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ query, doc_id: docId }),
-      });
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, username, password }),
+      }),
 
-      if (!res.ok) throw new Error("Stream request failed");
-      if (!res.body) throw new Error("No response body");
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        if (cancelled) break;
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const event = JSON.parse(line.slice(6));
-            if (event.type === "token") onToken(event.content);
-            else if (event.type === "status") onStatus(event.message);
-            else if (event.type === "done") onDone(event.metadata);
-            else if (event.type === "error") onError(event.message);
-          } catch {}
+    login: (email: string, password: string) => {
+      const body = new URLSearchParams({ username: email, password });
+      return req<{ access_token: string; username: string; token_type: string }>(
+        "/auth/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body,
         }
-      }
-    } catch (err) {
-      onError(String(err));
-    }
-  })();
+      );
+    },
+  },
 
-  return () => { cancelled = true; };
-}
+  // ── Documents ───────────────────────────────────────────────────────────────
+  docs: {
+    upload: (file: File) => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return req<{ doc_id: string; filename: string; pages_loaded: number; chunks_stored: number }>(
+        "/documents/upload",
+        { method: "POST", headers: authH(), body: fd }
+      );
+    },
+
+    uploadBatch: (files: File[]) => {
+      const fd = new FormData();
+      files.forEach(f => fd.append("files", f));
+      return req<{
+        uploaded: number;
+        failed: number;
+        results: Array<{ doc_id: string; filename: string; pages_loaded: number; chunks_stored: number }>;
+        errors: Array<{ filename: string; error: string }>;
+      }>("/documents/upload/batch", { method: "POST", headers: authH(), body: fd });
+    },
+
+    list: () =>
+      req<{
+        total: number;
+        documents: Array<{ doc_id: string; filename: string; pages: number; chunks: number; uploaded_at: string }>;
+      }>("/documents/list"),
+
+    delete: (doc_id: string) =>
+      req<{ message: string; doc_id: string }>(
+        `/documents/delete/${doc_id}`,
+        { method: "DELETE", headers: authH() }
+      ),
+
+    status: () => req<Record<string, unknown>>("/documents/status"),
+  },
+
+  // ── Queries ─────────────────────────────────────────────────────────────────
+  query: {
+    simple: (question: string, doc_id?: string | string[]) =>
+      req<{ answer: string; sources?: unknown[] }>("/documents/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authH() },
+        body: JSON.stringify({ question, doc_id: doc_id ?? null }),
+      }),
+
+    agent: (query: string, doc_id?: string | string[]) =>
+      req<{
+        answer: string;
+        tools_used: string[];
+        reasoning: string;
+        llm_calls: number;
+        sub_queries: string[];
+        sources: unknown[];
+      }>("/documents/agent/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authH() },
+        body: JSON.stringify({ query, doc_id: doc_id ?? null }),
+      }),
+  },
+
+  // ── History ─────────────────────────────────────────────────────────────────
+  history: {
+    list: (limit = 50) =>
+      req<{
+        total: number;
+        queries: Array<{
+          id: number;
+          query: string;
+          answer: string;
+          answer_preview: string;
+          tools_used: string;
+          reasoning: string;
+          llm_calls: number;
+          created_at: string;
+        }>;
+      }>(`/history/queries?limit=${limit}`),
+
+    get: (id: number) =>
+      req<{
+        id: number;
+        query: string;
+        answer: string;
+        tools_used: string;
+        reasoning: string;
+        llm_calls: number;
+        created_at: string;
+      }>(`/history/queries/${id}`),
+
+    delete: (id: number) =>
+      req<{ message: string; id: number }>(
+        `/history/queries/${id}`,
+        { method: "DELETE", headers: authH() }
+      ),
+
+    documents: () =>
+      req<{
+        total: number;
+        documents: Array<{ doc_id: string; filename: string; pages: number; chunks: number; uploaded_at: string }>;
+      }>("/history/documents"),
+  },
+
+  // ── Streaming ────────────────────────────────────────────────────────────────
+  stream: (
+    query: string,
+    doc_id: string | string[] | undefined,
+    cb: {
+      onStatus: (msg: string) => void;
+      onToken: (t: string) => void;
+      onDone: (meta: Record<string, unknown>) => void;
+      onError: (e: string) => void;
+    }
+  ): (() => void) => {
+    // AbortController gives us a real cancellation path
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const res = await fetch(`${BASE}/documents/agent/stream`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authH() },
+          body: JSON.stringify({ query, doc_id: doc_id ?? null }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok || !res.body) {
+          throw new Error(`Stream request failed: HTTP ${res.status}`);
+        }
+
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop() ?? "";
+
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue;
+              try {
+                const evt = JSON.parse(line.slice(6)) as {
+                  type: string;
+                  content?: string;
+                  message?: string;
+                  metadata?: Record<string, unknown>;
+                };
+                if (evt.type === "token" && evt.content !== undefined) {
+                  cb.onToken(evt.content);
+                } else if (evt.type === "status" && evt.message) {
+                  cb.onStatus(evt.message);
+                } else if (evt.type === "done") {
+                  cb.onDone(evt.metadata ?? {});
+                } else if (evt.type === "error" && evt.message) {
+                  cb.onError(evt.message);
+                }
+              } catch {
+                // malformed SSE line — skip
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock();
+        }
+      } catch (err: unknown) {
+        // AbortError is expected on cancel — don't surface it
+        if (err instanceof Error && err.name === "AbortError") return;
+        cb.onError(err instanceof Error ? err.message : "Stream failed");
+      }
+    })();
+
+    // Return cancel function
+    return () => controller.abort();
+  },
+};

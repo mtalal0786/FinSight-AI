@@ -1,9 +1,10 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Clock, Zap } from "lucide-react";
-import { getHistory } from "@/lib/api";
-import { isLoggedIn } from "@/lib/auth";
+import { api } from "@/lib/api";
+import { auth } from "@/lib/auth";
 
 interface Query {
   id: number;
@@ -20,11 +21,23 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isLoggedIn()) { router.push("/login"); return; }
-    getHistory().then((data) => {
-      setQueries(data.queries || []);
-      setLoading(false);
-    });
+    if (!auth.isLoggedIn()) {
+      router.push("/login");
+      return;
+    }
+
+    const fetchHistory = async () => {
+      try {
+        const data = await api.history.list();
+        setQueries((data.queries as Query[]) || []);
+      } catch (err: unknown) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHistory();
   }, [router]);
 
   return (
@@ -42,11 +55,16 @@ export default function HistoryPage() {
         {loading ? (
           <div className="text-gray-400">Loading...</div>
         ) : queries.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">No queries yet. Start asking questions!</div>
+          <div className="text-center py-12 text-gray-500">
+            No queries yet. Start asking questions!
+          </div>
         ) : (
           <div className="space-y-4">
             {queries.map((q) => (
-              <div key={q.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-gray-600 transition">
+              <div
+                key={q.id}
+                className="bg-gray-900 border border-gray-800 rounded-2xl p-5 hover:border-gray-600 transition"
+              >
                 <p className="font-medium text-white mb-2">{q.query}</p>
                 <p className="text-sm text-gray-400 mb-3 leading-relaxed">{q.answer_preview}</p>
                 <div className="flex items-center gap-4 text-xs text-gray-500">

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 import uuid
 
 
@@ -116,14 +116,20 @@ class RAGService:
     async def query_document(
         self,
         question: str,
-        doc_id: Optional[str] = None,
+        doc_ids: Optional[Union[str, list[str]]] = None,
         k: int = 5,
     ) -> dict:
         vector_store = get_vector_store()
 
         search_kwargs: dict = {"k": k}
-        if doc_id:
-            search_kwargs["filter"] = {"doc_id": doc_id}
+        if doc_ids:
+            if isinstance(doc_ids, str):
+                # Single document filter
+                filter_value = doc_ids
+            else:
+                # Multiple docs filter
+                filter_value = {"$in": doc_ids}
+            search_kwargs["filter"] = {"doc_id": filter_value}
 
         retriever = vector_store.as_retriever(
             search_type="similarity",
@@ -152,7 +158,7 @@ class RAGService:
             "question": question,
             "answer": result["result"],
             "sources": sources,
-            "doc_id": doc_id,
+            "doc_id": doc_ids,
         }
 
     def list_documents(self) -> dict:

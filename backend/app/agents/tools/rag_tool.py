@@ -1,16 +1,16 @@
-from typing import Optional
+from typing import Optional, Union
 from app.services.rag_service import rag_service
 
 
 async def search_documents(
     query: str,
-    doc_id: Optional[str] = None,
+    doc_id: Optional[Union[str, list[str]]] = None,
     top_k: int = 5,
 ) -> dict:
     try:
         result = await rag_service.query_document(
             question=query,
-            doc_id=doc_id,
+            doc_ids=doc_id,
             k=top_k,
         )
         return {

@@ -1,17 +1,24 @@
-export function saveToken(token: string, username: string) {
-  localStorage.setItem("finsight_token", token);
-  localStorage.setItem("finsight_username", username);
+const TOKEN_KEY = "finsight_token";
+const USER_KEY = "finsight_username";
+
+function ls(): Storage | null {
+  return typeof window !== "undefined" ? localStorage : null;
 }
 
-export function clearToken() {
-  localStorage.removeItem("finsight_token");
-  localStorage.removeItem("finsight_username");
-}
+export const auth = {
+  save: (token: string, username: string) => {
+    ls()?.setItem(TOKEN_KEY, token);
+    ls()?.setItem(USER_KEY, username);
+  },
 
-export function getUsername(): string | null {
-  return localStorage.getItem("finsight_username");
-}
+  clear: () => {
+    ls()?.removeItem(TOKEN_KEY);
+    ls()?.removeItem(USER_KEY);
+  },
 
-export function isLoggedIn(): boolean {
-  return !!localStorage.getItem("finsight_token");
-}
+  token: (): string | null => ls()?.getItem(TOKEN_KEY) ?? null,
+
+  username: (): string => ls()?.getItem(USER_KEY) ?? "User",
+
+  isLoggedIn: (): boolean => Boolean(ls()?.getItem(TOKEN_KEY)),
+};

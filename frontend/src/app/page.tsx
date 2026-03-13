@@ -1,76 +1,115 @@
 "use client";
 import Link from "next/link";
-import { TrendingUp, FileSearch, Zap, Shield, ArrowRight, BarChart3 } from "lucide-react";
+import { TrendingUp, Bot, FileSearch, BarChart2, Shield, ArrowRight, Zap } from "lucide-react";
+
+const FEATURES = [
+  {
+    icon: Bot,
+    title: "Multi-tool AI Agent",
+    desc: "Autonomous agent that routes queries across finance APIs, web search, and your documents simultaneously.",
+  },
+  {
+    icon: FileSearch,
+    title: "Multi-document RAG",
+    desc: "Upload multiple PDFs — annual reports, 10-Ks, earnings transcripts — and query across all of them at once.",
+  },
+  {
+    icon: BarChart2,
+    title: "Live market data",
+    desc: "Real-time stock prices, P/E ratios, market cap, and fundamentals via Yahoo Finance.",
+  },
+  {
+    icon: Zap,
+    title: "Streaming responses",
+    desc: "See answers build in real time with tool execution logs and reasoning traces.",
+  },
+];
+
+const EXAMPLES = [
+  "Analyze Apple's last 3 earnings reports and identify risk factors",
+  "Compare TSLA vs RIVIAN fundamentally — give me an investment thesis",
+  "What is the market sentiment around NVIDIA this week?",
+  "Here's my revenue CSV — what trends do you see?",
+];
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* Navbar */}
-      <nav className="border-b border-gray-800 px-6 py-4 flex justify-between items-center">
+      {/* Nav */}
+      <nav className="border-b border-gray-800/60 px-6 py-4 flex items-center justify-between max-w-6xl mx-auto">
         <div className="flex items-center gap-2">
-          <TrendingUp className="text-emerald-400" size={24} />
-          <span className="text-xl font-bold">FinSight AI</span>
+          <TrendingUp className="text-emerald-400" size={22} />
+          <span className="font-bold text-lg">FinSight AI</span>
         </div>
-        <div className="flex gap-3">
-          <Link href="/login" className="px-4 py-2 text-gray-300 hover:text-white transition">
-            Login
+        <div className="flex items-center gap-3">
+          <Link href="/login"
+            className="text-sm text-gray-400 hover:text-white transition px-3 py-1.5 rounded-lg hover:bg-gray-800">
+            Sign in
           </Link>
-          <Link href="/register" className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 rounded-lg font-medium transition">
-            Get Started
+          <Link href="/register"
+            className="text-sm bg-emerald-500 hover:bg-emerald-400 text-white px-4 py-1.5 rounded-lg font-medium transition">
+            Get started free
           </Link>
         </div>
       </nav>
 
       {/* Hero */}
-      <div className="max-w-5xl mx-auto px-6 py-24 text-center">
-        <div className="inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-400 px-4 py-1.5 rounded-full text-sm font-medium mb-6 border border-emerald-500/20">
-          <Zap size={14} />
-          Powered by Gemini 2.5 Flash + LangGraph
+      <section className="max-w-4xl mx-auto px-6 pt-20 pb-16 text-center">
+        <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs px-3 py-1.5 rounded-full mb-6">
+          <Zap size={12} />
+          Bloomberg Terminal meets ChatGPT — actually accessible
         </div>
-        <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
-          Financial Research,{" "}
-          <span className="text-emerald-400">Supercharged by AI</span>
+        <h1 className="text-4xl sm:text-5xl font-bold leading-tight mb-5">
+          AI-powered financial<br />
+          <span className="text-emerald-400">intelligence platform</span>
         </h1>
-        <p className="text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
-          Upload financial reports, ask complex questions, get live stock data, news,
-          and fundamental analysis — all in one intelligent platform.
+        <p className="text-gray-400 text-lg max-w-2xl mx-auto mb-8 leading-relaxed">
+          From raw financial data to boardroom-ready insights in seconds. Upload reports,
+          query live markets, and let autonomous AI agents do the research.
         </p>
-        <div className="flex gap-4 justify-center">
-          <Link href="/register" className="flex items-center gap-2 px-8 py-3 bg-emerald-500 hover:bg-emerald-400 rounded-xl font-semibold text-lg transition">
-            Start for Free <ArrowRight size={18} />
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          <Link href="/register"
+            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-white px-6 py-3 rounded-xl font-semibold transition text-sm">
+            Start for free <ArrowRight size={16} />
           </Link>
-          <Link href="/dashboard" className="flex items-center gap-2 px-8 py-3 border border-gray-700 hover:border-gray-500 rounded-xl font-semibold text-lg transition">
-            Try Demo
+          <Link href="/login"
+            className="text-sm text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 px-6 py-3 rounded-xl transition">
+            Sign in
           </Link>
         </div>
-      </div>
+      </section>
+
+      {/* Example queries */}
+      <section className="max-w-3xl mx-auto px-6 pb-16">
+        <p className="text-xs text-gray-500 text-center uppercase tracking-widest mb-5">What you can ask</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {EXAMPLES.map(q => (
+            <div key={q} className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-sm text-gray-300 leading-relaxed">
+              &ldquo;{q}&rdquo;
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Features */}
-      <div className="max-w-5xl mx-auto px-6 pb-24 grid md:grid-cols-3 gap-6">
-        {[
-          {
-            icon: <FileSearch className="text-emerald-400" size={28} />,
-            title: "Document RAG",
-            desc: "Upload 10-Ks, earnings reports, or any PDF and ask questions with full source citations.",
-          },
-          {
-            icon: <BarChart3 className="text-blue-400" size={28} />,
-            title: "Live Market Data",
-            desc: "Real-time stock prices, P/E ratios, earnings history, and analyst targets.",
-          },
-          {
-            icon: <Zap className="text-purple-400" size={28} />,
-            title: "Agentic AI",
-            desc: "Multi-tool AI agent that breaks down complex questions and synthesizes answers from all sources.",
-          },
-        ].map((f) => (
-          <div key={f.title} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-gray-600 transition">
-            <div className="mb-4">{f.icon}</div>
-            <h3 className="text-lg font-semibold mb-2">{f.title}</h3>
-            <p className="text-gray-400 text-sm">{f.desc}</p>
-          </div>
-        ))}
-      </div>
+      <section className="max-w-4xl mx-auto px-6 pb-20">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {FEATURES.map(({ icon: Icon, title, desc }) => (
+            <div key={title} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-4">
+                <Icon className="text-emerald-400" size={20} />
+              </div>
+              <h3 className="font-semibold mb-2">{title}</h3>
+              <p className="text-sm text-gray-400 leading-relaxed">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-gray-800/60 py-8 text-center text-xs text-gray-600">
+        FinSight AI — Built with LangChain, FastAPI, and Next.js
+      </footer>
     </div>
   );
 }
