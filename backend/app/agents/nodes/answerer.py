@@ -49,7 +49,7 @@ Rules:
 async def answerer_node(state: AgentState) -> AgentState:
     llm = ChatGoogleGenerativeAI(
         model=settings.GEMINI_MODEL,
-        google_api_key=settings.GOOGLE_API_KEY,
+        google_api_key=settings.GEMINI_API_KEY,
         temperature=0.3,
         convert_system_message_to_human=True,
     )

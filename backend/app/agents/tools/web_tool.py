@@ -2,6 +2,7 @@ import httpx
 import os
 import json
 from typing import Optional
+from app.core.config import settings
 
 
 # ── SearXNG ───────────────────────────────────────────────────────────────────
@@ -70,8 +71,8 @@ async def _google_cse_search(query: str, limit: int = 6) -> list[dict]:
     Set GOOGLE_CSE_KEY and GOOGLE_CSE_ID in .env to enable.
     Get free key: https://programmablesearchengine.google.com/
     """
-    api_key = os.getenv("GOOGLE_CSE_KEY", "")
-    cse_id = os.getenv("GOOGLE_CSE_ID", "")
+    api_key = settings.GOOGLE_CSE_KEY
+    cse_id = settings.GOOGLE_CSE_ID
 
     if not api_key or not cse_id:
         return []
@@ -112,7 +113,7 @@ async def _google_cse_search(query: str, limit: int = 6) -> list[dict]:
 
 async def _tavily_search(query: str, limit: int = 6) -> Optional[dict]:
     """Tavily — best quality results, needs free key from tavily.com"""
-    api_key = os.getenv("TAVILY_API_KEY", "")
+    api_key =settings.TAVILY_API_KEY
     if not api_key:
         return None
 

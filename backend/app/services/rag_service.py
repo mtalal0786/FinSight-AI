@@ -33,12 +33,24 @@ def get_embeddings():
         model_kwargs={"device": "cpu"},
         encode_kwargs={"normalize_embeddings": True},
     )
+    # Only when moving to any bigger embedding model ht fotken is required 
+    # from app.core.config import settings
+    # embeddings_kwargs = {}
+    # if settings.HF_TOKEN:
+    #     embeddings_kwargs["token"] = settings.HF_TOKEN
+
+    # return HuggingFaceEmbeddings(
+    #     model_name="sentence-transformers/all-MiniLM-L6-v2",
+    #     model_kwargs={"device": "cpu"},
+    #     encode_kwargs={"normalize_embeddings": True},
+    #     **embeddings_kwargs,  # only adds token if present
+    # )
 
 
 def get_llm() -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
         model=settings.GEMINI_MODEL,
-        google_api_key=settings.GOOGLE_API_KEY,
+        google_api_key=settings.GEMINI_API_KEY,
         temperature=0.3,
         convert_system_message_to_human=True,
     )

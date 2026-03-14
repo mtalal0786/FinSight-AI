@@ -1,12 +1,17 @@
 import httpx
 import os
+from app.core.config import settings
+
+# New – use the validated settings object
+key = settings.ALPHA_VANTAGE_KEY or "demo"
+
 
 
 BASE_URL = "https://www.alphavantage.co/query"
 
 
-def get_key() -> str:
-    return os.getenv("ALPHA_VANTAGE_KEY", "demo")  # "demo" works for testing
+# def get_key() -> str:
+#     return os.getenv("ALPHA_VANTAGE_KEY", "demo")  # "demo" works for testing
 
 
 async def get_company_overview(ticker: str) -> dict:
@@ -20,7 +25,7 @@ async def get_company_overview(ticker: str) -> dict:
             response = await client.get(BASE_URL, params={
                 "function": "OVERVIEW",
                 "symbol": ticker,
-                "apikey": get_key(),
+                "apikey": key,
             })
 
         data = response.json()
@@ -62,7 +67,7 @@ async def get_earnings(ticker: str) -> dict:
             response = await client.get(BASE_URL, params={
                 "function": "EARNINGS",
                 "symbol": ticker,
-                "apikey": get_key(),
+                "apikey": key,
             })
 
         data = response.json()

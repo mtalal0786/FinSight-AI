@@ -1,5 +1,6 @@
 import httpx
 import os
+from app.core.config import settings
 
 
 async def _search_news_searxng(query: str, limit: int = 6) -> list[dict]:
@@ -62,7 +63,7 @@ async def get_financial_news(company_or_ticker: str, days: int = 7) -> dict:
     query = f"{company_or_ticker} stock earnings financial news"
 
     # Try Tavily first if key exists
-    tavily_key = os.getenv("TAVILY_API_KEY", "")
+    tavily_key = settings.TAVILY_API_KEY
     if tavily_key:
         try:
             async with httpx.AsyncClient(timeout=12.0) as client:
@@ -120,7 +121,7 @@ async def get_sector_news(sector: str) -> dict:
 
     # Tavily fallback if SearXNG fails
     if not articles:
-        tavily_key = os.getenv("TAVILY_API_KEY", "")
+        tavily_key = settings.TAVILY_API_KEY
         if tavily_key:
             try:
                 async with httpx.AsyncClient(timeout=12.0) as client:

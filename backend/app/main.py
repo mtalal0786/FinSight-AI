@@ -11,6 +11,24 @@ from app.routers import auth, history
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # At the end of lifespan, after settings is created
+    import os
+    os.environ["GEMINI_API_KEY"] = settings.GEMINI_API_KEY
+    os.environ["ALPHA_VANTAGE_KEY"] = settings.ALPHA_VANTAGE_KEY
+    os.environ["TAVILY_API_KEY"] = settings.TAVILY_API_KEY
+    os.environ["HF_TOKEN"] = settings.HF_TOKEN
+    os.environ["SECRET_KEY"] = settings.SECRET_KEY
+    os.environ["DATABASE_URL"] = settings.DATABASE_URL
+    os.environ["CHROMA_DB_PATH"] = settings.get_chroma_path()
+    os.environ["UPLOAD_DIR"] = settings.get_upload_path().as_posix()
+    os.environ["DEBUG"] = str(settings.DEBUG)
+    os.environ["APP_NAME"] = settings.APP_NAME
+    os.environ["GEMINI_MODEL"] = settings.GEMINI_MODEL
+    os.environ["EMBEDDING_PROVIDER"] = settings.EMBEDDING_PROVIDER
+    os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"] = str(settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    os.environ["GOOGLE_CSE_ID"] = settings.GOOGLE_CSE_ID if hasattr(settings, "GOOGLE_CSE_ID") else ""
+    os.environ["GOOGLE_CSE_KEY"] = settings.GOOGLE_CSE_KEY if hasattr(settings, "GOOGLE_CSE_KEY") else ""
+    print("===================================\n")
     print(f"\n🚀 Starting {settings.APP_NAME} v0.3.0")
     print(f"🤖 LLM:        {settings.GEMINI_MODEL}")
     print(f"🔢 Embeddings: {settings.EMBEDDING_PROVIDER}")
