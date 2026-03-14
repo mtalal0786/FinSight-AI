@@ -1,111 +1,156 @@
 import httpx
-import urllib.parse
+import os
+
+
+async def _search_news_searxng(query: str, limit: int = 6) -> list[dict]:
+    """Use SearXNG news category for actual news articles."""
+    INSTANCES = [
+        "https://searx.be",
+        "https://search.bus-hit.me",
+        "https://searx.tiekoetter.com",
+    ]
+    HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+    }
+
+    for instance in INSTANCES:
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                response = await client.get(
+                    f"{instance}/search",
+                    params={
+                        "q": query,
+                        "format": "json",
+                        "categories": "news",
+                        "language": "en",
+                        "time_range": "week",
+                    },
+                    headers=HEADERS,
+                )
+
+            if response.status_code != 200:
+                continue
+
+            data = response.json()
+            results = []
+
+            for r in data.get("results", [])[:limit]:
+                results.append({
+                    "title": r.get("title", ""),
+                    "url": r.get("url", ""),
+                    "source": r.get("engine", r.get("publishedDate", "SearXNG")),
+                    "snippet": r.get("content", "")[:400],
+                    "published": r.get("publishedDate", "recent"),
+                })
+
+            if results:
+                return results
+
+        except Exception as e:
+            print(f"⚠️ SearXNG news {instance} failed: {e}")
+            continue
+
+    return []
 
 
 async def get_financial_news(company_or_ticker: str, days: int = 7) -> dict:
     """
-    Get financial news using DuckDuckGo Instant Answer API.
-    Pure httpx — no compiled packages, no DLLs.
+    Get financial news using SearXNG (real results, no key needed).
+    Falls back to Tavily if key is configured.
     """
-    try:
-        query = f"{company_or_ticker} stock earnings financial news"
+    query = f"{company_or_ticker} stock earnings financial news"
 
-        async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
-            response = await client.get(
-                "https://api.duckduckgo.com/",
-                params={
-                    "q": query,
-                    "format": "json",
-                    "no_html": "1",
-                    "skip_disambig": "1",
-                },
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                },
-            )
+    # Try Tavily first if key exists
+    tavily_key = os.getenv("TAVILY_API_KEY", "")
+    if tavily_key:
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                response = await client.post(
+                    "https://api.tavily.com/search",
+                    json={
+                        "api_key": tavily_key,
+                        "query": query,
+                        "max_results": 6,
+                        "include_answer": False,
+                        "search_depth": "basic",
+                        "topic": "news",
+                    },
+                )
+            if response.status_code == 200:
+                data = response.json()
+                articles = [
+                    {
+                        "title": r.get("title", ""),
+                        "url": r.get("url", ""),
+                        "source": "Tavily",
+                        "snippet": r.get("content", "")[:400],
+                        "published": r.get("published_date", "recent"),
+                    }
+                    for r in data.get("results", [])
+                ]
+                if articles:
+                    return {
+                        "success": True,
+                        "company": company_or_ticker,
+                        "news_count": len(articles),
+                        "articles": articles,
+                        "provider": "tavily",
+                    }
+        except Exception:
+            pass
 
-        data = response.json()
-        articles = []
-
-        if data.get("AbstractText"):
-            articles.append({
-                "title": data.get("Heading", company_or_ticker),
-                "url": data.get("AbstractURL", ""),
-                "source": data.get("AbstractSource", ""),
-                "snippet": data.get("AbstractText", "")[:400],
-                "published": "recent",
-            })
-
-        for topic in data.get("RelatedTopics", [])[:6]:
-            if isinstance(topic, dict) and topic.get("Text"):
-                articles.append({
-                    "title": topic.get("Text", "")[:100],
-                    "url": topic.get("FirstURL", ""),
-                    "source": "DuckDuckGo",
-                    "snippet": topic.get("Text", "")[:300],
-                    "published": "recent",
-                })
-
-        return {
-            "success": True,
-            "company": company_or_ticker,
-            "news_count": len(articles),
-            "articles": articles,
-        }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "company": company_or_ticker,
-            "error": str(e),
-            "articles": [],
-        }
+    # SearXNG fallback
+    articles = await _search_news_searxng(query, limit=6)
+    return {
+        "success": True if articles else False,
+        "company": company_or_ticker,
+        "news_count": len(articles),
+        "articles": articles,
+        "provider": "searxng",
+        "error": None if articles else "No news found. Add TAVILY_API_KEY to .env for reliable news.",
+    }
 
 
 async def get_sector_news(sector: str) -> dict:
     """Get news for an entire market sector."""
-    try:
-        query = f"{sector} industry sector stock market trends"
+    query = f"{sector} sector stock market trends analysis"
 
-        async with httpx.AsyncClient(timeout=12.0, follow_redirects=True) as client:
-            response = await client.get(
-                "https://api.duckduckgo.com/",
-                params={
-                    "q": query,
-                    "format": "json",
-                    "no_html": "1",
-                },
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                },
-            )
+    articles = await _search_news_searxng(query, limit=6)
 
-        data = response.json()
-        articles = []
+    # Tavily fallback if SearXNG fails
+    if not articles:
+        tavily_key = os.getenv("TAVILY_API_KEY", "")
+        if tavily_key:
+            try:
+                async with httpx.AsyncClient(timeout=12.0) as client:
+                    response = await client.post(
+                        "https://api.tavily.com/search",
+                        json={
+                            "api_key": tavily_key,
+                            "query": query,
+                            "max_results": 6,
+                        },
+                    )
+                if response.status_code == 200:
+                    data = response.json()
+                    articles = [
+                        {
+                            "title": r.get("title", ""),
+                            "url": r.get("url", ""),
+                            "source": "Tavily",
+                            "snippet": r.get("content", "")[:400],
+                            "published": "recent",
+                        }
+                        for r in data.get("results", [])
+                    ]
+            except Exception:
+                pass
 
-        if data.get("AbstractText"):
-            articles.append({
-                "title": data.get("Heading", sector),
-                "url": data.get("AbstractURL", ""),
-                "source": data.get("AbstractSource", ""),
-                "snippet": data.get("AbstractText", "")[:400],
-            })
-
-        for topic in data.get("RelatedTopics", [])[:5]:
-            if isinstance(topic, dict) and topic.get("Text"):
-                articles.append({
-                    "title": topic.get("Text", "")[:100],
-                    "url": topic.get("FirstURL", ""),
-                    "source": "DuckDuckGo",
-                    "snippet": topic.get("Text", "")[:300],
-                })
-
-        return {
-            "success": True,
-            "sector": sector,
-            "news_count": len(articles),
-            "articles": articles,
-        }
-
-    except Exception as e:
-        return {"success": False, "sector": sector, "error": str(e), "articles": []}
+    return {
+        "success": True if articles else False,
+        "sector": sector,
+        "news_count": len(articles),
+        "articles": articles,
+        "provider": "searxng" if articles else "none",
+    }

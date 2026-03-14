@@ -1,10 +1,10 @@
-from typing import TypedDict
+from typing import TypedDict, Optional, Union, List
 
 
 class AgentState(TypedDict):
     # Input
     user_query: str
-    doc_id: str | None
+    doc_id: Optional[Union[str, List[str]]]   # ← change this line
 
     # Routing
     sub_queries: list[str]
