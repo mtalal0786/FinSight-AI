@@ -30,7 +30,14 @@ class Settings(BaseSettings):
 
     GOOGLE_CSE_ID: str = ""
     GOOGLE_CSE_KEY: str = ""
-    
+
+    MAIL_USERNAME: str = ""
+    MAIL_PASSWORD: str = ""
+    MAIL_FROM: str = ""
+    MAIL_FROM_NAME: str = ""
+    MAIL_SERVER: str = ""
+    MAIL_PORT: int = 587
+    FRONTEND_URL: str = ""
 
     SECRET_KEY: str = "change-this-secret-key"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60

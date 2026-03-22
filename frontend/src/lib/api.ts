@@ -8,21 +8,26 @@ function authH(): Record<string, string> {
 
 async function req<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(BASE + path, opts);
+
   let data: unknown;
   try {
     data = await res.json();
   } catch {
     throw new Error(`HTTP ${res.status}`);
   }
+
   if (!res.ok) {
     const detail = (data as { detail?: string })?.detail;
     throw new Error(detail || `HTTP ${res.status}`);
   }
+
   return data as T;
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
+// ── API ───────────────────────────────────────────────────────────────────────
 export const api = {
+
+  // ── Auth ────────────────────────────────────────────────────────────────────
   auth: {
     register: (email: string, username: string, password: string) =>
       req<{ message: string }>("/auth/register", {
@@ -31,17 +36,71 @@ export const api = {
         body: JSON.stringify({ email, username, password }),
       }),
 
-    login: (email: string, password: string) => {
-      const body = new URLSearchParams({ username: email, password });
-      return req<{ access_token: string; username: string; token_type: string }>(
-        "/auth/login",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body,
-        }
-      );
+    // ✅ UPDATED LOGIN (identifier support + full user data)
+    login: (identifier: string, password: string) => {
+      const body = new URLSearchParams({ username: identifier, password });
+
+      return req<{
+        access_token: string;
+        token_type: string;
+        username: string;
+        email: string;
+        display_name: string;
+        avatar_color: string;
+      }>("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+      });
     },
+
+    // ✅ NEW: Forgot Password
+    forgotPassword: (email: string) =>
+      req<{ message: string }>("/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      }),
+
+    // ✅ NEW: Reset Password
+    resetPassword: (token: string, new_password: string) =>
+      req<{ message: string }>("/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, new_password }),
+      }),
+
+    // ✅ NEW: Update Profile
+    updateProfile: (data: {
+      display_name?: string;
+      username?: string;
+      avatar_color?: string;
+    }) =>
+      req<{ message: string }>("/auth/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authH() },
+        body: JSON.stringify(data),
+      }),
+
+    // ✅ NEW: Change Password
+    changePassword: (current_password: string, new_password: string) =>
+      req<{ message: string }>("/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authH() },
+        body: JSON.stringify({ current_password, new_password }),
+      }),
+
+    // ✅ NEW: Verify Token (session restore)
+    verifyToken: () =>
+      req<{
+        valid: boolean;
+        username: string;
+        email: string;
+        display_name: string;
+        avatar_color: string;
+      }>("/auth/verify-token", {
+        headers: authH(),
+      }),
   },
 
   // ── Documents ───────────────────────────────────────────────────────────────
@@ -49,27 +108,50 @@ export const api = {
     upload: (file: File) => {
       const fd = new FormData();
       fd.append("file", file);
-      return req<{ doc_id: string; filename: string; pages_loaded: number; chunks_stored: number }>(
-        "/documents/upload",
-        { method: "POST", headers: authH(), body: fd }
-      );
+
+      return req<{
+        doc_id: string;
+        filename: string;
+        pages_loaded: number;
+        chunks_stored: number;
+      }>("/documents/upload", {
+        method: "POST",
+        headers: authH(),
+        body: fd,
+      });
     },
 
     uploadBatch: (files: File[]) => {
       const fd = new FormData();
       files.forEach(f => fd.append("files", f));
+
       return req<{
         uploaded: number;
         failed: number;
-        results: Array<{ doc_id: string; filename: string; pages_loaded: number; chunks_stored: number }>;
+        results: Array<{
+          doc_id: string;
+          filename: string;
+          pages_loaded: number;
+          chunks_stored: number;
+        }>;
         errors: Array<{ filename: string; error: string }>;
-      }>("/documents/upload/batch", { method: "POST", headers: authH(), body: fd });
+      }>("/documents/upload/batch", {
+        method: "POST",
+        headers: authH(),
+        body: fd,
+      });
     },
 
     list: () =>
       req<{
         total: number;
-        documents: Array<{ doc_id: string; filename: string; pages: number; chunks: number; uploaded_at: string }>;
+        documents: Array<{
+          doc_id: string;
+          filename: string;
+          pages: number;
+          chunks: number;
+          uploaded_at: string;
+        }>;
       }>("/documents/list"),
 
     delete: (doc_id: string) =>
@@ -142,84 +224,110 @@ export const api = {
     documents: () =>
       req<{
         total: number;
-        documents: Array<{ doc_id: string; filename: string; pages: number; chunks: number; uploaded_at: string }>;
+        documents: Array<{
+          doc_id: string;
+          filename: string;
+          pages: number;
+          chunks: number;
+          uploaded_at: string;
+        }>;
       }>("/history/documents"),
   },
 
-  // ── Streaming ────────────────────────────────────────────────────────────────
+  // ── Streaming ───────────────────────────────────────────────────────────────
   stream: (
-    query: string,
-    doc_id: string | string[] | undefined,
-    cb: {
-      onStatus: (msg: string) => void;
-      onToken: (t: string) => void;
-      onDone: (meta: Record<string, unknown>) => void;
-      onError: (e: string) => void;
-    }
-  ): (() => void) => {
-    // AbortController gives us a real cancellation path
-    const controller = new AbortController();
+  query: string,
+  doc_id: string | string[] | undefined,
+  cb: {
+    onStatus: (msg: string) => void;
+    onToken: (t: string) => void;
+    onDone: (meta: Record<string, unknown>) => void;
+    onError: (e: string) => void;
+  }
+): (() => void) => {
+  const controller = new AbortController();
 
-    (async () => {
-      try {
-        const res = await fetch(`${BASE}/documents/agent/stream`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authH() },
-          body: JSON.stringify({ query, doc_id: doc_id ?? null }),
-          signal: controller.signal,
-        });
+  (async () => {
+    try {
+      const res = await fetch(`${BASE}/documents/agent/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authH() },
+        body: JSON.stringify({ query, doc_id: doc_id ?? null }),
+        signal: controller.signal,
+      });
 
-        if (!res.ok || !res.body) {
-          throw new Error(`Stream request failed: HTTP ${res.status}`);
-        }
-
-        const reader = res.body.getReader();
-        const dec = new TextDecoder();
-        let buf = "";
-
+      if (!res.ok || !res.body) {
+        // Try to extract error detail from response body
+        let errMsg = `Stream request failed: HTTP ${res.status}`;
         try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+          const errData = await res.json();
+          if (errData.detail) errMsg = errData.detail;
+        } catch { /* ignore */ }
+        cb.onError(errMsg);
+        return;
+      }
 
-            buf += dec.decode(value, { stream: true });
-            const lines = buf.split("\n");
-            buf = lines.pop() ?? "";
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
 
-            for (const line of lines) {
-              if (!line.startsWith("data: ")) continue;
-              try {
-                const evt = JSON.parse(line.slice(6)) as {
-                  type: string;
-                  content?: string;
-                  message?: string;
-                  metadata?: Record<string, unknown>;
-                };
-                if (evt.type === "token" && evt.content !== undefined) {
-                  cb.onToken(evt.content);
-                } else if (evt.type === "status" && evt.message) {
-                  cb.onStatus(evt.message);
-                } else if (evt.type === "done") {
-                  cb.onDone(evt.metadata ?? {});
-                } else if (evt.type === "error" && evt.message) {
-                  cb.onError(evt.message);
-                }
-              } catch {
-                // malformed SSE line — skip
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buf += dec.decode(value, { stream: true });
+
+          // SSE events are separated by double newlines
+          // Split carefully — a single data: line may itself contain \\n (escaped)
+          const events = buf.split("\n\n");
+          // Keep the last incomplete chunk in the buffer
+          buf = events.pop() ?? "";
+
+          for (const event of events) {
+            // An SSE event may have multiple lines; find the data: line
+            const dataLine = event
+              .split("\n")
+              .find(l => l.startsWith("data: "));
+
+            if (!dataLine) continue;
+
+            const jsonStr = dataLine.slice(6).trim();
+            if (!jsonStr || jsonStr === "[DONE]") continue;
+
+            try {
+              const evt = JSON.parse(jsonStr) as {
+                type: string;
+                content?: string;
+                message?: string;
+                metadata?: Record<string, unknown>;
+              };
+
+              if (evt.type === "token" && evt.content !== undefined) {
+                cb.onToken(evt.content);
+              } else if (evt.type === "status" && evt.message) {
+                cb.onStatus(evt.message);
+              } else if (evt.type === "done") {
+                cb.onDone(evt.metadata ?? {});
+              } else if (evt.type === "error" && evt.message) {
+                cb.onError(evt.message);
               }
+            } catch (parseErr) {
+              // Don't surface JSON parse errors as chat messages —
+              // just log them and continue processing the stream
+              console.warn("SSE parse error (skipping):", parseErr, "raw:", jsonStr.slice(0, 120));
             }
           }
-        } finally {
-          reader.releaseLock();
         }
-      } catch (err: unknown) {
-        // AbortError is expected on cancel — don't surface it
-        if (err instanceof Error && err.name === "AbortError") return;
-        cb.onError(err instanceof Error ? err.message : "Stream failed");
+      } finally {
+        reader.releaseLock();
       }
-    })();
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      cb.onError(err instanceof Error ? err.message : "Stream failed");
+    }
+  })();
 
-    // Return cancel function
-    return () => controller.abort();
-  },
+  return () => controller.abort();
+},
 };

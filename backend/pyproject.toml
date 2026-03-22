@@ -26,6 +26,7 @@ dependencies = [
     "passlib[bcrypt]",
     "sqlalchemy",
     "aiosqlite",
+    "fastapi-mail>=1.6.2",
 ]
 
 [build-system]

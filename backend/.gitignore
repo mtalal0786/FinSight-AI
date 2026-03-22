@@ -10,3 +10,12 @@ wheels/
 .venv
 .env
 venv/
+
+#upload files
+*.log
+*.pdf
+*.csv
+*.xlsx
+*.json
+uploads/
+data/uploads/

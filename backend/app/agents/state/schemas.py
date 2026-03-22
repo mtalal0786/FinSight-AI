@@ -18,7 +18,8 @@ class AgentState(TypedDict):
     alpha_vantage_results: dict
     web_results: dict
     news_results: dict
-
+    extra_results: dict        # earnings, analyst, dividends, insider, economic
+    
     # Output
     final_answer: str
     sources: list[dict]
